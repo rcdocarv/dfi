@@ -13,7 +13,7 @@ from bson import ObjectId
 #pn.config.require_https = True
 
 # Configuração do Panel
-pn.extension()
+pn.extension(sizing_mode="stretch_width")
 
 # Conexão com MongoDB
 client = AsyncIOMotorClient('mongodb://localhost:27017/')
@@ -114,26 +114,83 @@ login_btn = pn.widgets.Button(name="Login", button_type="success")
 logout_btn = pn.widgets.Button(name="Logout", button_type="warning")
 message = pn.pane.Markdown("")
 
+# Classe pro estado do menu (simples e funcional)
+class MenuState(param.Parameterized):
+    selected = param.ObjectSelector(default='user', objects=['user', 'systems', 'help'])
 
-# Componentes da Sidebar
+menu_state = MenuState()  # Instância
+
+# Função pro conteúdo dinâmico (só texto, como querias)
+def get_content(selected):
+    if selected == 'user':
+        return pn.pane.Markdown(f"""
+        # Perfil do Usuário
+        
+        Bem-vindo ao seu perfil, {auth.current_user}!
+        
+        - Nome: João Silva
+        - Email: joao@email.com
+        - Último login: 05/10/2025
+        """)
+    elif selected == 'systems':
+        return pn.pane.Markdown("""
+        # Sistemas
+        
+        Gerencie os sistemas disponíveis.
+        
+        - Sistema A: Status online
+        - Sistema B: Manutenção em andamento
+        - Sistema C: Offline
+        """)
+    elif selected == 'help':
+        return pn.pane.Markdown("""
+        # Ajuda
+        
+        Precisa de suporte? Consulte nossa documentação.
+        
+        - FAQ: Perguntas frequentes
+        - Contato: support@meuapp.com
+        - Tutorial: Clique aqui para vídeo
+        """)
+    else:
+        return pn.pane.Markdown("# Dashboard Inicial\nSelecione um menu na sidebar.")
+
+# Conteúdo bound (aqui o fix: pn.bind faz o reativo automático)
+main_content = pn.bind(get_content, menu_state.param.selected)
+
+# Botões do menu (ícones, light pra moderno)
+user_btn = pn.widgets.Button(name='👤 Usuário', button_type='light', width=200, height=40)
+systems_btn = pn.widgets.Button(name='⚙️ Sistemas', button_type='light', width=200, height=40)
+help_btn = pn.widgets.Button(name='❓ Ajuda', button_type='light', width=200, height=40)
+
+# Callbacks simples (só setam o estado — bind cuida do resto)
+def on_user_click(event): menu_state.selected = 'user'
+def on_systems_click(event): menu_state.selected = 'systems'
+def on_help_click(event): menu_state.selected = 'help'
+
+user_btn.on_click(on_user_click)
+systems_btn.on_click(on_systems_click)
+help_btn.on_click(on_help_click)
+
+# Sidebar: Header + botões com ar + logout (visible=False inicial)
 sidebar_menu = pn.Column(
-    pn.pane.Markdown("## 📋 Menu"),
-    pn.widgets.Button(name="🏠 Início", button_type="primary"),
-    pn.widgets.Button(name="📁 Projetos", button_type="primary"),
-    pn.widgets.Button(name="⚙️ Configurações", button_type="primary"),
-    sizing_mode="stretch_width"
+    pn.pane.HTML('<h3 style="color: #1976d2; text-align: center; margin: 20px 0;">Meu App</h3>'),
+    pn.layout.Divider(),
+    user_btn,
+    pn.layout.Spacer(height=10),
+    systems_btn,
+    pn.layout.Spacer(height=10),
+    help_btn,
+    pn.layout.Spacer(height=20),
+    logout_btn,  # Adicionado logout no final
+    sizing_mode='stretch_height',
+    visible=False  # Inicialmente invisível pra evitar erro
 )
 
-
-# Dashboard principal
+# Dashboard principal (agora usa o main_content)
 def dashboard_view():
     return pn.Column(
-        pn.pane.Markdown(f"# 🎉 Bem-vindo, {auth.current_user}!"),
-        pn.pane.Markdown("### Você está logado no sistema"),
-        pn.layout.Divider(),
-        pn.widgets.Button(name="Meu Perfil", button_type="primary"),
-        pn.widgets.Button(name="Configurações", button_type="primary"),
-        logout_btn,
+        main_content,
         sizing_mode="stretch_width"
     )
 
@@ -162,7 +219,6 @@ async def register_callback(event):
         username_input.value = ""
         password_input.value = ""
 
-
 async def login_callback(event):
     if not username_input.value or not password_input.value:
         message.object = "**Erro**: Preencha todos os campos"
@@ -177,12 +233,17 @@ async def login_callback(event):
         # Atualiza o layout principal
         def update_layout():
             template.main[:] = [dynamic_layout(auth.is_logged_in)]
+            sidebar_menu.visible = True  # Mostra sidebar
         state.curdoc.add_next_tick_callback(update_layout)
         password_input.value = ""
 
 async def logout_callback(event):
     success, msg = await auth.logout_user()
     message.object = f"**{msg}**"
+    def update_layout():
+        template.main[:] = [dynamic_layout(auth.is_logged_in)]
+        sidebar_menu.visible = False  # Esconde sidebar
+    state.curdoc.add_next_tick_callback(update_layout)
 
 # Configurar callbacks com execução assíncrona
 def setup_callbacks():
@@ -190,25 +251,24 @@ def setup_callbacks():
     login_btn.on_click(lambda event: asyncio.create_task(login_callback(event)))
     logout_btn.on_click(lambda event: asyncio.create_task(logout_callback(event)))
 
-
 def dynamic_layout(is_logged_in):
-    template.sidebar.clear()
     if is_logged_in:
-        template.sidebar.append(sidebar_menu)
         return dashboard_view()
     else:
         return login_view()
 
-# Template principal
-template = pn.template.BootstrapTemplate(
+# Template principal (mudado pra MaterialTemplate pra combinar com sidebar)
+template = pn.template.MaterialTemplate(
     title="Sistema daphi_Stakeholders",
     header_background="#2E86AB",
+    sidebar=[sidebar_menu],  # Adiciona sidebar com visible=False inicial
 )
 
 # Inicializar a aplicação
 def init_app():
     setup_callbacks()
     template.main[:] = [pn.bind(dynamic_layout, auth.param.is_logged_in)]
+    # Não seta sidebar = [] aqui — já tá no constructor
     return template
 
 # Servir a aplicação
