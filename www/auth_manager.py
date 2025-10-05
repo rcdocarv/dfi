@@ -83,4 +83,4 @@ class AuthManager(param.Parameterized):
             self.is_logged_in = True
             self.session_token = token
             return True
-        return False
+        return False  
