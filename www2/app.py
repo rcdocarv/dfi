@@ -120,38 +120,19 @@ class MenuState(param.Parameterized):
 
 menu_state = MenuState()  # Instância
 
-# Função pro conteúdo dinâmico (só texto, como querias)
+# Importar os módulos das páginas (aqui é a única mudança!)
+from user_page import get_user_content
+from systems_page import get_systems_content
+from help_page import get_help_content
+
+# Função pro conteúdo dinâmico (agora chama os módulos separados)
 def get_content(selected):
     if selected == 'user':
-        return pn.pane.Markdown(f"""
-        # Perfil do Usuário
-        
-        Bem-vindo ao seu perfil, {auth.current_user}!
-        
-        - Nome: João Silva
-        - Email: joao@email.com
-        - Último login: 05/10/2025
-        """)
+        return get_user_content(auth.current_user)  # Passa o usuário pro módulo
     elif selected == 'systems':
-        return pn.pane.Markdown("""
-        # Sistemas
-        
-        Gerencie os sistemas disponíveis.
-        
-        - Sistema A: Status online
-        - Sistema B: Manutenção em andamento
-        - Sistema C: Offline
-        """)
+        return get_systems_content()
     elif selected == 'help':
-        return pn.pane.Markdown("""
-        # Ajuda
-        
-        Precisa de suporte? Consulte nossa documentação.
-        
-        - FAQ: Perguntas frequentes
-        - Contato: support@meuapp.com
-        - Tutorial: Clique aqui para vídeo
-        """)
+        return get_help_content()
     else:
         return pn.pane.Markdown("# Dashboard Inicial\nSelecione um menu na sidebar.")
 
