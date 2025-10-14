@@ -9,4 +9,4 @@ def get_user_content(current_user):
     - Nome: João Silva
     - Email: joao@email.com
     - Último login: 05/10/2025
-    """)
+    """) 
